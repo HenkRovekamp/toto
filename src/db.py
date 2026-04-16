@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 def _connect(db_path: str, read_only: bool = False) -> duckdb.DuckDBPyConnection:
     """Open a DuckDB connection. MotherDuck connections never use read_only."""
     if db_path.startswith("md:"):
-        return _connect(db_path)
+        return duckdb.connect(db_path)
     return duckdb.connect(db_path, read_only=read_only)
 
 CREATE_TABLE_SQL = """
