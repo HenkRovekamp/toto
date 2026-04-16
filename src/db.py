@@ -92,7 +92,7 @@ def save_fantasy_team(db_path: str, manager_name: str, team_name: str, rider_url
     try:
         next_id = conn.execute("SELECT coalesce(max(id), 0) + 1 FROM fantasy_teams").fetchone()[0]
         conn.execute(
-            "INSERT INTO fantasy_teams (id, manager_name, team_name) VALUES (?, ?, ?)",
+            "INSERT INTO fantasy_teams (id, manager_name, team_name, created_at) VALUES (?, ?, ?, now())",
             [next_id, manager_name, team_name],
         )
         for slot, url in enumerate(rider_urls, start=1):
