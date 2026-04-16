@@ -71,7 +71,7 @@ init_races_table(DB_PATH)
 
 st.caption(f"Database contains **{total:,}** riders")
 
-tab_explorer, tab_giro, tab_bp, tab_scores, tab_settings = st.tabs(["🔍 Explorer", "🏁 Giro d'Italia", "🚵 De Brabantse Pijl", "🏆 Scores", "⚙️ Settings"])
+tab_explorer, tab_giro, tab_bp, tab_scores, tab_settings = st.tabs(["🔍 Explorer", "🏁 Giro d'Italia", "🚵 De Brabantse Pijl", "🏆 Scores", "👥 Teams"])
 
 # ── Tab: Explorer ─────────────────────────────────────────────────────────────
 with tab_explorer:
@@ -386,9 +386,9 @@ with tab_scores:
                 else:
                     st.info("None of this team's riders finished in the top 15 of any stage yet.")
 
-# ── Tab: Settings ─────────────────────────────────────────────────────────────
+# ── Tab: Teams ───────────────────────────────────────────────────────────────
 with tab_settings:
-    st.subheader("⚙️ Race Settings")
+    st.subheader("👥 Teams")
 
     races_for_settings = load_races(DB_PATH)
     races_for_settings_names = [r["race_name"] for r in races_for_settings]
