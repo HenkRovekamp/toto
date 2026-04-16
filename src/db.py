@@ -84,37 +84,45 @@ def init_fantasy_tables(db_path: str) -> None:
     try:
         conn.execute(FANTASY_TEAMS_SQL)
         conn.execute(FANTASY_RIDERS_SQL)
-        # Migration: add race_name column if it doesn't exist yet
+        # Migrations
         try:
             conn.execute("ALTER TABLE fantasy_teams ADD COLUMN race_name VARCHAR")
         except Exception:
-            pass  # column already exists
+            pass
+        try:
+            conn.execute("ALTER TABLE fantasy_teams ADD COLUMN account_id INTEGER")
+        except Exception:
+            pass
     finally:
         conn.close()
 
 
-def save_fantasy_team(db_path: str, manager_name: str, team_name: str, rider_urls: list[str], race_name: str = None) -> int:
+def save_fantasy_team(db_path: str, manager_name: str, team_name: str, rider_urls: list[str], race_name: str = None, account_id: int = None) -> int:
     conn = _connect(db_path)
     try:
-        # Check if this manager already has a team for this race
-        existing = conn.execute(
-            "SELECT id FROM fantasy_teams WHERE lower(manager_name) = lower(?) AND race_name = ?",
-            [manager_name, race_name],
-        ).fetchone()
+        if account_id is not None:
+            existing = conn.execute(
+                "SELECT id FROM fantasy_teams WHERE account_id = ? AND race_name = ?",
+                [account_id, race_name],
+            ).fetchone()
+        else:
+            existing = conn.execute(
+                "SELECT id FROM fantasy_teams WHERE lower(manager_name) = lower(?) AND race_name = ?",
+                [manager_name, race_name],
+            ).fetchone()
 
         if existing:
             team_id = existing[0]
-            # Update team name and riders
             conn.execute(
-                "UPDATE fantasy_teams SET team_name = ? WHERE id = ?",
-                [team_name, team_id],
+                "UPDATE fantasy_teams SET team_name = ?, manager_name = ? WHERE id = ?",
+                [team_name, manager_name, team_id],
             )
             conn.execute("DELETE FROM fantasy_team_riders WHERE team_id = ?", [team_id])
         else:
             team_id = conn.execute("SELECT coalesce(max(id), 0) + 1 FROM fantasy_teams").fetchone()[0]
             conn.execute(
-                "INSERT INTO fantasy_teams (id, manager_name, team_name, race_name, created_at) VALUES (?, ?, ?, ?, now())",
-                [team_id, manager_name, team_name, race_name],
+                "INSERT INTO fantasy_teams (id, manager_name, team_name, race_name, account_id, created_at) VALUES (?, ?, ?, ?, ?, now())",
+                [team_id, manager_name, team_name, race_name, account_id],
             )
 
         for slot, url in enumerate(rider_urls, start=1):
@@ -127,13 +135,13 @@ def save_fantasy_team(db_path: str, manager_name: str, team_name: str, rider_url
         conn.close()
 
 
-def load_team_by_manager(db_path: str, manager_name: str, race_name: str) -> dict | None:
-    """Return existing team (with rider urls) for a manager+race, or None."""
+def load_team_by_account(db_path: str, account_id: int, race_name: str) -> dict | None:
+    """Return existing team for an account+race, or None."""
     conn = _connect(db_path, read_only=True)
     try:
         row = conn.execute(
-            "SELECT id, team_name FROM fantasy_teams WHERE lower(manager_name) = lower(?) AND race_name = ?",
-            [manager_name, race_name],
+            "SELECT id, team_name FROM fantasy_teams WHERE account_id = ? AND race_name = ?",
+            [account_id, race_name],
         ).fetchone()
         if not row:
             return None
@@ -143,6 +151,51 @@ def load_team_by_manager(db_path: str, manager_name: str, race_name: str) -> dic
             [team_id],
         ).fetchall()]
         return {"id": team_id, "team_name": team_name, "rider_urls": urls}
+    finally:
+        conn.close()
+
+
+# ── Accounts ───────────────────────────────────────────────────────────────────────
+CREATE_ACCOUNTS_SQL = """
+CREATE TABLE IF NOT EXISTS accounts (
+    id         INTEGER,
+    email      VARCHAR,
+    name       VARCHAR,
+    created_at TIMESTAMP DEFAULT now()
+)
+"""
+
+
+def init_accounts_table(db_path: str) -> None:
+    conn = _connect(db_path)
+    try:
+        conn.execute(CREATE_ACCOUNTS_SQL)
+    finally:
+        conn.close()
+
+
+def get_account_by_email(db_path: str, email: str) -> dict | None:
+    conn = _connect(db_path, read_only=True)
+    try:
+        row = conn.execute(
+            "SELECT id, email, name FROM accounts WHERE lower(email) = lower(?)", [email.strip()]
+        ).fetchone()
+        if not row:
+            return None
+        return {"id": row[0], "email": row[1], "name": row[2]}
+    finally:
+        conn.close()
+
+
+def create_account(db_path: str, email: str, name: str) -> dict:
+    conn = _connect(db_path)
+    try:
+        next_id = conn.execute("SELECT coalesce(max(id), 0) + 1 FROM accounts").fetchone()[0]
+        conn.execute(
+            "INSERT INTO accounts (id, email, name, created_at) VALUES (?, ?, ?, now())",
+            [next_id, email.lower().strip(), name.strip()],
+        )
+        return {"id": next_id, "email": email.lower().strip(), "name": name.strip()}
     finally:
         conn.close()
 

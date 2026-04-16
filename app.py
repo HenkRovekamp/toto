@@ -9,6 +9,7 @@ from src.db import (
     init_stage_results_table, save_stage_results, load_stage_results, stages_with_results,
     calculate_scores, calculate_stage_breakdown,
     init_races_table, load_races, update_deadline,
+    init_accounts_table,
 )
 
 load_dotenv()
@@ -68,6 +69,7 @@ init_fantasy_tables(DB_PATH)
 init_stages_table(DB_PATH)
 init_stage_results_table(DB_PATH)
 init_races_table(DB_PATH)
+init_accounts_table(DB_PATH)
 
 st.caption(f"Database contains **{total:,}** riders")
 
