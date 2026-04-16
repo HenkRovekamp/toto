@@ -2,7 +2,7 @@ import os
 import duckdb
 import streamlit as st
 from dotenv import load_dotenv
-from src.db import init_fantasy_tables, save_fantasy_team, _connect
+from src.db import init_fantasy_tables, save_fantasy_team, _connect, load_races, is_registration_open
 
 load_dotenv()
 
@@ -21,6 +21,21 @@ if not DB_PATH.startswith("md:") and not os.path.exists(DB_PATH):
     st.stop()
 
 init_fantasy_tables(DB_PATH)
+
+# ── Check registration deadlines ──────────────────────────────────────────────
+races = load_races(DB_PATH)
+open_races = [r for r in races if is_registration_open(DB_PATH, r["race_name"])]
+
+if not open_races:
+    st.error("⏰ Registration is closed for all races. No new teams can be submitted.")
+    st.stop()
+
+race_options = {r["race_name"]: r for r in open_races}
+selected_race = st.selectbox("Select a race to register for", list(race_options.keys()))
+
+race_info = race_options[selected_race]
+if race_info["deadline"]:
+    st.info(f"Registration closes on **{race_info['deadline'].strftime('%d/%m/%Y at %H:%M')}**")
 
 # ── Load all riders ───────────────────────────────────────────────────────────
 @st.cache_data(ttl=300)
@@ -64,6 +79,8 @@ if submitted:
         errors.append("Please enter a team name.")
     if len(selected_labels) != 15:
         errors.append(f"Select exactly 15 riders (you selected {len(selected_labels)}).")
+    if not is_registration_open(DB_PATH, selected_race):
+        errors.append("Registration has closed for this race.")
 
     if errors:
         for e in errors:

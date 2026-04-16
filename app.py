@@ -8,6 +8,7 @@ from src.db import (
     init_stages_table, load_stages,
     init_stage_results_table, save_stage_results, load_stage_results, stages_with_results,
     calculate_scores, calculate_stage_breakdown,
+    init_races_table, load_races, update_deadline,
 )
 
 load_dotenv()
@@ -66,6 +67,7 @@ except Exception:
 init_fantasy_tables(DB_PATH)
 init_stages_table(DB_PATH)
 init_stage_results_table(DB_PATH)
+init_races_table(DB_PATH)
 
 st.caption(f"Database contains **{total:,}** riders")
 
@@ -199,6 +201,32 @@ with tab_team:
                     hide_index=True,
                     width="stretch",
                 )
+
+    # ── Registration deadlines ─────────────────────────────────────────────────
+    st.divider()
+    st.subheader("Registration Deadlines")
+    st.caption("After the deadline, participants can no longer register or change their team.")
+
+    races = load_races(DB_PATH)
+    for race in races:
+        with st.expander(race["race_name"], expanded=True):
+            current = race["deadline"]
+            new_deadline = st.date_input(
+                "Deadline date",
+                value=current.date() if current else None,
+                key=f"dl_date_{race['race_name']}",
+            )
+            new_time = st.time_input(
+                "Deadline time",
+                value=current.time() if current else None,
+                key=f"dl_time_{race['race_name']}",
+            )
+            if st.button("💾 Save deadline", key=f"dl_save_{race['race_name']}"):
+                from datetime import datetime
+                combined = datetime.combine(new_deadline, new_time)
+                update_deadline(DB_PATH, race["race_name"], combined)
+                st.success(f"Deadline updated to {combined.strftime('%d/%m/%Y %H:%M')}")
+                st.rerun()
 
 # ── Tab: Giro d'Italia ────────────────────────────────────────────────────────
 with tab_giro:

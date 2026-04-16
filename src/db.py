@@ -132,6 +132,75 @@ def load_fantasy_team_riders(db_path: str, team_id: int) -> list[str]:
         conn.close()
 
 
+# ── Races (with deadlines) ───────────────────────────────────────────────────
+
+CREATE_RACES_SQL = """
+CREATE TABLE IF NOT EXISTS races (
+    race_name VARCHAR PRIMARY KEY,
+    deadline  TIMESTAMP
+)
+"""
+
+RACE_SEEDS = [
+    ("Giro d'Italia",     "2026-05-07 22:00:00"),
+    ("De Brabantse Pijl", "2026-04-16 22:00:00"),
+]
+
+
+def init_races_table(db_path: str) -> None:
+    conn = _connect(db_path)
+    try:
+        conn.execute(CREATE_RACES_SQL)
+        for race_name, deadline in RACE_SEEDS:
+            exists = conn.execute(
+                "SELECT count(*) FROM races WHERE race_name = ?", [race_name]
+            ).fetchone()[0]
+            if not exists:
+                conn.execute(
+                    "INSERT INTO races (race_name, deadline) VALUES (?, ?)",
+                    [race_name, deadline],
+                )
+    finally:
+        conn.close()
+
+
+def load_races(db_path: str) -> list[dict]:
+    conn = _connect(db_path, read_only=True)
+    try:
+        rows = conn.execute(
+            "SELECT race_name, deadline FROM races ORDER BY deadline"
+        ).fetchall()
+        return [{"race_name": r[0], "deadline": r[1]} for r in rows]
+    finally:
+        conn.close()
+
+
+def update_deadline(db_path: str, race_name: str, deadline) -> None:
+    conn = _connect(db_path)
+    try:
+        conn.execute(
+            "UPDATE races SET deadline = ? WHERE race_name = ?",
+            [deadline, race_name],
+        )
+    finally:
+        conn.close()
+
+
+def is_registration_open(db_path: str, race_name: str) -> bool:
+    """Returns True if the deadline has not yet passed (or no deadline set)."""
+    conn = _connect(db_path, read_only=True)
+    try:
+        row = conn.execute(
+            "SELECT deadline FROM races WHERE race_name = ?", [race_name]
+        ).fetchone()
+        if not row or row[0] is None:
+            return True
+        from datetime import datetime, timezone
+        return datetime.now(timezone.utc) < row[0].replace(tzinfo=timezone.utc)
+    finally:
+        conn.close()
+
+
 # ── Stages ────────────────────────────────────────────────────────────────────
 
 CREATE_STAGES_SQL = """
