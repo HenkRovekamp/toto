@@ -160,9 +160,9 @@ if selected_urls:
     st.markdown("**Geselecteerde renners:**")
     for i, url in enumerate(selected_urls):
         label = url_to_label.get(url, url)
-        col_name, col_btn = st.columns([5, 1])
+        col_name, col_btn = st.columns([5, 1], vertical_alignment="center")
         col_name.markdown(f"{i + 1}. {label.split(' (')[0]}")
-        if col_btn.button("✖", key=f"remove_{i}", use_container_width=True):
+        if col_btn.button("✖", key=f"remove_{i}", use_container_width=True, help="Verwijderen"):
             st.session_state[state_key].pop(i)
             st.rerun()
 else:
