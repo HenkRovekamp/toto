@@ -1,0 +1,5 @@
+procyclingstats
+cloudscraper
+duckdb
+pdfplumber
+streamlit

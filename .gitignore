@@ -38,3 +38,10 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
+# Data
+data/*.duckdb
+data/*.db
+
+# PDFs (drop them in pdfs/ folder, not tracked in git)
+pdfs/
+
