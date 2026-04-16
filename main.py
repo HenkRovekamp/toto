@@ -2,6 +2,7 @@ import logging
 import os
 import time
 
+from dotenv import load_dotenv
 from src.scraper import get_all_rider_urls, get_rider_profile, SLEEP_BETWEEN_REQUESTS
 from src.db import init_db, upsert_rider, rider_count
 
@@ -12,11 +13,20 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "data", "cycling.duckdb")
+load_dotenv()
+_TOKEN = os.getenv("MOTHERDUCK_TOKEN")
+if _TOKEN:
+    DB_PATH = f"md:toto?motherduck_token={_TOKEN}"
+    logger.info("Using MotherDuck database")
+else:
+    DB_PATH = os.path.join(os.path.dirname(__file__), "data", "cycling.duckdb")
+    os.makedirs(os.path.join(os.path.dirname(__file__), "data"), exist_ok=True)
+    logger.info(f"Using local database: {DB_PATH}")
 
 
 def main() -> None:
-    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    if not DB_PATH.startswith("md:"):
+        os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     conn = init_db(DB_PATH)
 
     rider_urls = get_all_rider_urls()
