@@ -242,6 +242,23 @@ with tab_giro:
         else:
             st.info("No results entered yet for this stage.")
 
+    # ── Registration deadline ──────────────────────────────────────────────────
+    st.divider()
+    st.markdown("#### Registration Deadline")
+    _giro_races = load_races(DB_PATH)
+    _giro_race = next((r for r in _giro_races if r["race_name"] == "Giro d'Italia"), None)
+    if _giro_race:
+        _cur = _giro_race["deadline"]
+        _c1, _c2, _c3 = st.columns([2, 2, 1])
+        _new_date = _c1.date_input("Date", value=_cur.date() if _cur else None, key="giro_dl_date")
+        _new_time = _c2.time_input("Time", value=_cur.time() if _cur else None, key="giro_dl_time")
+        if _c3.button("💾 Save", key="giro_dl_save", use_container_width=True):
+            from datetime import datetime
+            combined = datetime.combine(_new_date, _new_time)
+            update_deadline(DB_PATH, "Giro d'Italia", combined)
+            st.success(f"Deadline updated to {combined.strftime('%d/%m/%Y %H:%M')}")
+            st.rerun()
+
 # ── Tab: De Brabantse Pijl ───────────────────────────────────────────────────
 with tab_bp:
     st.subheader("De Brabantse Pijl")
@@ -313,6 +330,23 @@ with tab_bp:
             else:
                 st.info("No results entered yet.")
 
+    # ── Registration deadline ──────────────────────────────────────────────────
+    st.divider()
+    st.markdown("#### Registration Deadline")
+    _bp_races = load_races(DB_PATH)
+    _bp_race = next((r for r in _bp_races if r["race_name"] == "De Brabantse Pijl"), None)
+    if _bp_race:
+        _cur = _bp_race["deadline"]
+        _c1, _c2, _c3 = st.columns([2, 2, 1])
+        _new_date = _c1.date_input("Date", value=_cur.date() if _cur else None, key="bp_dl_date")
+        _new_time = _c2.time_input("Time", value=_cur.time() if _cur else None, key="bp_dl_time")
+        if _c3.button("💾 Save", key="bp_dl_save", use_container_width=True):
+            from datetime import datetime
+            combined = datetime.combine(_new_date, _new_time)
+            update_deadline(DB_PATH, "De Brabantse Pijl", combined)
+            st.success(f"Deadline updated to {combined.strftime('%d/%m/%Y %H:%M')}")
+            st.rerun()
+
 # ── Tab: Scores ───────────────────────────────────────────────────────────────
 with tab_scores:
     st.subheader("🏆 Fantasy Scores — Giro d'Italia")
@@ -373,28 +407,4 @@ with tab_settings:
                     width="stretch",
                 )
 
-    st.divider()
-    st.markdown("#### Registration Deadlines")
-    st.caption("After the deadline, participants can no longer register or change their team.")
 
-    races = load_races(DB_PATH)
-    for race in races:
-        with st.expander(race["race_name"], expanded=True):
-            current = race["deadline"]
-            col1, col2, col3 = st.columns([2, 2, 1])
-            new_deadline = col1.date_input(
-                "Date",
-                value=current.date() if current else None,
-                key=f"dl_date_{race['race_name']}",
-            )
-            new_time = col2.time_input(
-                "Time",
-                value=current.time() if current else None,
-                key=f"dl_time_{race['race_name']}",
-            )
-            if col3.button("💾 Save", key=f"dl_save_{race['race_name']}", use_container_width=True):
-                from datetime import datetime
-                combined = datetime.combine(new_deadline, new_time)
-                update_deadline(DB_PATH, race["race_name"], combined)
-                st.success(f"Deadline updated to {combined.strftime('%d/%m/%Y %H:%M')}")
-                st.rerun()
