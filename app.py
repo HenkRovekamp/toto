@@ -71,7 +71,7 @@ init_races_table(DB_PATH)
 
 st.caption(f"Database contains **{total:,}** riders")
 
-tab_explorer, tab_team, tab_giro, tab_bp, tab_scores = st.tabs(["🔍 Explorer", "⭐ My Team", "🏁 Giro d'Italia", "🚵 De Brabantse Pijl", "🏆 Scores"])
+tab_explorer, tab_giro, tab_bp, tab_scores, tab_settings = st.tabs(["🔍 Explorer", "🏁 Giro d'Italia", "🚵 De Brabantse Pijl", "🏆 Scores", "⚙️ Settings"])
 
 # ── Tab: Explorer ─────────────────────────────────────────────────────────────
 with tab_explorer:
@@ -127,106 +127,6 @@ with tab_explorer:
             col2.metric("Weight", f"{row['weight']} kg" if pd.notna(row.get("weight")) else "—")
             if row.get("rider_url"):
                 st.markdown(f"[View on ProCyclingStats](https://www.procyclingstats.com/{row['rider_url']})")
-
-# ── Tab: My Team ──────────────────────────────────────────────────────────────
-with tab_team:
-    st.subheader("Build Your Fantasy Team")
-
-    # Load all riders for the picker
-    _conn3 = get_connection()
-    all_riders_df = _conn3.execute(
-        "SELECT rider_url, name, nationality, team_name FROM riders WHERE name IS NOT NULL ORDER BY name"
-    ).df()
-    _conn3.close()
-
-    # Map display label → rider_url
-    rider_options = {
-        f"{row['name']} ({row['nationality'] or '?'}) — {row['team_name'] or '?'}": row["rider_url"]
-        for _, row in all_riders_df.iterrows()
-    }
-
-    with st.form("team_form"):
-        col_a, col_b = st.columns(2)
-        manager_name = col_a.text_input("Your name", placeholder="e.g. Johan")
-        team_name_input = col_b.text_input("Team name", placeholder="e.g. Team Velodutch")
-
-        selected_labels = st.multiselect(
-            "Select exactly 15 riders",
-            options=list(rider_options.keys()),
-            max_selections=15,
-            placeholder="Search and select riders...",
-        )
-        submitted = st.form_submit_button("💾 Save Team", use_container_width=True)
-
-    if submitted:
-        errors = []
-        if not manager_name.strip():
-            errors.append("Enter your name.")
-        if not team_name_input.strip():
-            errors.append("Enter a team name.")
-        if len(selected_labels) != 15:
-            errors.append(f"Select exactly 15 riders (currently {len(selected_labels)}).")
-
-        if errors:
-            for e in errors:
-                st.error(e)
-        else:
-            selected_urls = [rider_options[label] for label in selected_labels]
-            try:
-                team_id = save_fantasy_team(DB_PATH, manager_name.strip(), team_name_input.strip(), selected_urls)
-                st.success(f"Team **{team_name_input.strip()}** saved! (ID {team_id})")
-            except Exception as exc:
-                st.error(f"Could not save team: {exc}")
-
-    # ── View saved teams ───────────────────────────────────────────────────────
-    st.divider()
-    st.subheader("Saved Teams")
-
-    teams = load_fantasy_teams(DB_PATH)
-    if not teams:
-        st.info("No teams saved yet.")
-    else:
-        team_labels = {f"{t['team_name']} (by {t['manager_name']})": t["id"] for t in teams}
-        chosen_label = st.selectbox("View a team", list(team_labels.keys()))
-        if chosen_label:
-            chosen_id = team_labels[chosen_label]
-            team_riders = load_fantasy_team_riders(DB_PATH, chosen_id)
-            if team_riders:
-                st.dataframe(
-                    pd.DataFrame(team_riders).rename(columns={
-                        "name": "Rider",
-                        "nationality": "NAT",
-                        "team": "Team",
-                    }),
-                    hide_index=True,
-                    width="stretch",
-                )
-
-    # ── Registration deadlines ─────────────────────────────────────────────────
-    st.divider()
-    st.subheader("Registration Deadlines")
-    st.caption("After the deadline, participants can no longer register or change their team.")
-
-    races = load_races(DB_PATH)
-    for race in races:
-        with st.expander(race["race_name"], expanded=True):
-            current = race["deadline"]
-            new_deadline = st.date_input(
-                "Deadline date",
-                value=current.date() if current else None,
-                key=f"dl_date_{race['race_name']}",
-            )
-            new_time = st.time_input(
-                "Deadline time",
-                value=current.time() if current else None,
-                key=f"dl_time_{race['race_name']}",
-            )
-            if st.button("💾 Save deadline", key=f"dl_save_{race['race_name']}"):
-                from datetime import datetime
-                combined = datetime.combine(new_deadline, new_time)
-                update_deadline(DB_PATH, race["race_name"], combined)
-                st.success(f"Deadline updated to {combined.strftime('%d/%m/%Y %H:%M')}")
-                st.rerun()
 
 # ── Tab: Giro d'Italia ────────────────────────────────────────────────────────
 with tab_giro:
@@ -451,3 +351,50 @@ with tab_scores:
                     st.metric("Total points from shown stages", bd_df["Points"].sum())
                 else:
                     st.info("None of this team's riders finished in the top 15 of any stage yet.")
+
+# ── Tab: Settings ─────────────────────────────────────────────────────────────
+with tab_settings:
+    st.subheader("⚙️ Race Settings")
+
+    st.markdown("#### Registered Teams")
+    teams_all = load_fantasy_teams(DB_PATH)
+    if not teams_all:
+        st.info("No teams registered yet.")
+    else:
+        team_labels_all = {f"{t['team_name']} (by {t['manager_name']})": t["id"] for t in teams_all}
+        chosen_team = st.selectbox("View a team", list(team_labels_all.keys()), key="settings_team_select")
+        if chosen_team:
+            chosen_id = team_labels_all[chosen_team]
+            team_riders = load_fantasy_team_riders(DB_PATH, chosen_id)
+            if team_riders:
+                st.dataframe(
+                    pd.DataFrame(team_riders).rename(columns={"name": "Rider", "nationality": "NAT", "team": "Team"}),
+                    hide_index=True,
+                    width="stretch",
+                )
+
+    st.divider()
+    st.markdown("#### Registration Deadlines")
+    st.caption("After the deadline, participants can no longer register or change their team.")
+
+    races = load_races(DB_PATH)
+    for race in races:
+        with st.expander(race["race_name"], expanded=True):
+            current = race["deadline"]
+            col1, col2, col3 = st.columns([2, 2, 1])
+            new_deadline = col1.date_input(
+                "Date",
+                value=current.date() if current else None,
+                key=f"dl_date_{race['race_name']}",
+            )
+            new_time = col2.time_input(
+                "Time",
+                value=current.time() if current else None,
+                key=f"dl_time_{race['race_name']}",
+            )
+            if col3.button("💾 Save", key=f"dl_save_{race['race_name']}", use_container_width=True):
+                from datetime import datetime
+                combined = datetime.combine(new_deadline, new_time)
+                update_deadline(DB_PATH, race["race_name"], combined)
+                st.success(f"Deadline updated to {combined.strftime('%d/%m/%Y %H:%M')}")
+                st.rerun()

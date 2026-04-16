@@ -22,20 +22,23 @@ if not DB_PATH.startswith("md:") and not os.path.exists(DB_PATH):
 
 init_fantasy_tables(DB_PATH)
 
-# ── Check registration deadlines ──────────────────────────────────────────────
+# ── Race selection ────────────────────────────────────────────────────────────
 races = load_races(DB_PATH)
-open_races = [r for r in races if is_registration_open(DB_PATH, r["race_name"])]
-
-if not open_races:
-    st.error("⏰ Registration is closed for all races. No new teams can be submitted.")
+if not races:
+    st.error("No races configured yet. Ask the administrator.")
     st.stop()
 
-race_options = {r["race_name"]: r for r in open_races}
-selected_race = st.selectbox("Select a race to register for", list(race_options.keys()))
+race_options = {r["race_name"]: r for r in races}
+selected_race = st.selectbox("Select a race", list(race_options.keys()))
 
 race_info = race_options[selected_race]
+registration_open = is_registration_open(DB_PATH, selected_race)
+
 if race_info["deadline"]:
-    st.info(f"Registration closes on **{race_info['deadline'].strftime('%d/%m/%Y at %H:%M')}**")
+    if registration_open:
+        st.info(f"⏰ Registration closes on **{race_info['deadline'].strftime('%d/%m/%Y at %H:%M')}**")
+    else:
+        st.error(f"⏰ Registration closed on **{race_info['deadline'].strftime('%d/%m/%Y at %H:%M')}**. No new teams can be submitted.")
 
 # ── Load all riders ───────────────────────────────────────────────────────────
 @st.cache_data(ttl=300)
@@ -56,40 +59,41 @@ def get_rider_options():
 rider_options = get_rider_options()
 
 # ── Registration form ─────────────────────────────────────────────────────────
-with st.form("participant_form"):
-    col_a, col_b = st.columns(2)
-    manager_name = col_a.text_input("Your name", placeholder="e.g. Johan")
-    team_name = col_b.text_input("Team name", placeholder="e.g. Team Velodutch")
+if registration_open:
+    with st.form("participant_form"):
+        col_a, col_b = st.columns(2)
+        manager_name = col_a.text_input("Your name", placeholder="e.g. Johan")
+        team_name = col_b.text_input("Team name", placeholder="e.g. Team Velodutch")
 
-    selected_labels = st.multiselect(
-        "Select exactly 15 riders",
-        options=list(rider_options.keys()),
-        max_selections=15,
-        placeholder="Type a name to search...",
-    )
+        selected_labels = st.multiselect(
+            "Select exactly 15 riders",
+            options=list(rider_options.keys()),
+            max_selections=15,
+            placeholder="Type a name to search...",
+        )
 
-    st.caption(f"{len(selected_labels)} / 15 riders selected")
-    submitted = st.form_submit_button("✅ Register my team", use_container_width=True)
+        st.caption(f"{len(selected_labels)} / 15 riders selected")
+        submitted = st.form_submit_button("✅ Register my team", use_container_width=True)
 
-if submitted:
-    errors = []
-    if not manager_name.strip():
-        errors.append("Please enter your name.")
-    if not team_name.strip():
-        errors.append("Please enter a team name.")
-    if len(selected_labels) != 15:
-        errors.append(f"Select exactly 15 riders (you selected {len(selected_labels)}).")
-    if not is_registration_open(DB_PATH, selected_race):
-        errors.append("Registration has closed for this race.")
+    if submitted:
+        errors = []
+        if not manager_name.strip():
+            errors.append("Please enter your name.")
+        if not team_name.strip():
+            errors.append("Please enter a team name.")
+        if len(selected_labels) != 15:
+            errors.append(f"Select exactly 15 riders (you selected {len(selected_labels)}).")
+        if not is_registration_open(DB_PATH, selected_race):
+            errors.append("Registration has closed for this race.")
 
-    if errors:
-        for e in errors:
-            st.error(e)
-    else:
-        urls = [rider_options[lbl] for lbl in selected_labels]
-        try:
-            team_id = save_fantasy_team(DB_PATH, manager_name.strip(), team_name.strip(), urls)
-            st.success(f"Team **{team_name.strip()}** registered successfully! 🎉")
-            st.balloons()
-        except Exception as exc:
-            st.error(f"Could not save your team: {exc}")
+        if errors:
+            for e in errors:
+                st.error(e)
+        else:
+            urls = [rider_options[lbl] for lbl in selected_labels]
+            try:
+                team_id = save_fantasy_team(DB_PATH, manager_name.strip(), team_name.strip(), urls)
+                st.success(f"Team **{team_name.strip()}** registered successfully! 🎉")
+                st.balloons()
+            except Exception as exc:
+                st.error(f"Could not save your team: {exc}")
