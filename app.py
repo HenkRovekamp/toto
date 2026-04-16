@@ -69,7 +69,7 @@ init_stage_results_table(DB_PATH)
 
 st.caption(f"Database contains **{total:,}** riders")
 
-tab_explorer, tab_team, tab_giro, tab_scores = st.tabs(["🔍 Explorer", "⭐ My Team", "🏁 Giro d'Italia", "🏆 Scores"])
+tab_explorer, tab_team, tab_giro, tab_bp, tab_scores = st.tabs(["🔍 Explorer", "⭐ My Team", "🏁 Giro d'Italia", "🚵 De Brabantse Pijl", "🏆 Scores"])
 
 # ── Tab: Explorer ─────────────────────────────────────────────────────────────
 with tab_explorer:
@@ -313,6 +313,77 @@ with tab_giro:
             st.dataframe(pd.DataFrame(results), hide_index=True, width="stretch")
         else:
             st.info("No results entered yet for this stage.")
+
+# ── Tab: De Brabantse Pijl ───────────────────────────────────────────────────
+with tab_bp:
+    st.subheader("De Brabantse Pijl")
+
+    bp_stages = load_stages(DB_PATH, "De Brabantse Pijl")
+    bp_stage_names = [s["Stage"] for s in bp_stages]
+
+    sub_bp_enter, sub_bp_view = st.tabs(["📝 Enter Results", "📊 View Results"])
+
+    with sub_bp_enter:
+        if bp_stage_names:
+            bp_selected = st.selectbox("Select stage", bp_stage_names, key="bp_result_stage")
+            bp_existing = load_stage_results(DB_PATH, "De Brabantse Pijl", bp_selected)
+
+            _conn_bp = get_connection()
+            bp_riders_df = _conn_bp.execute(
+                "SELECT rider_url, name, nationality, team_name FROM riders WHERE name IS NOT NULL ORDER BY name"
+            ).df()
+            _conn_bp.close()
+
+            bp_rider_options = {
+                f"{row['name']} ({row['nationality'] or '?'}) — {row['team_name'] or '?'}": row["rider_url"]
+                for _, row in bp_riders_df.iterrows()
+            }
+            bp_url_to_label = {v: k for k, v in bp_rider_options.items()}
+
+            bp_prefill = []
+            if bp_existing:
+                _conn_pre2 = get_connection()
+                url_map2 = {row[0]: row[1] for row in _conn_pre2.execute("SELECT name, rider_url FROM riders").fetchall()}
+                _conn_pre2.close()
+                bp_prefill = [
+                    bp_url_to_label[u] for r in bp_existing
+                    if (u := next((v for n, v in url_map2.items() if n == r["Rider"]), None)) and u in bp_url_to_label
+                ]
+
+            if bp_existing:
+                st.info(f"Results already saved for **{bp_selected}** — editing will overwrite.")
+
+            with st.form("bp_results_form"):
+                st.markdown("Add riders **in finishing order** (1st → 15th).")
+                bp_top15 = st.multiselect(
+                    "Top 15 finishers",
+                    options=list(bp_rider_options.keys()),
+                    default=bp_prefill,
+                    max_selections=15,
+                    placeholder="Type a name to search...",
+                )
+                bp_save = st.form_submit_button("💾 Save Results", use_container_width=True)
+
+            if bp_save:
+                if len(bp_top15) != 15:
+                    st.error(f"Select exactly 15 finishers (currently {len(bp_top15)}).")
+                else:
+                    urls = [bp_rider_options[lbl] for lbl in bp_top15]
+                    try:
+                        save_stage_results(DB_PATH, "De Brabantse Pijl", bp_selected, urls)
+                        st.success(f"Results saved for **{bp_selected}**!")
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"Could not save results: {exc}")
+
+    with sub_bp_view:
+        if bp_stage_names:
+            bp_view_stage = st.selectbox("Select stage", bp_stage_names, key="bp_view_stage")
+            bp_results = load_stage_results(DB_PATH, "De Brabantse Pijl", bp_view_stage)
+            if bp_results:
+                st.dataframe(pd.DataFrame(bp_results), hide_index=True, width="stretch")
+            else:
+                st.info("No results entered yet.")
 
 # ── Tab: Scores ───────────────────────────────────────────────────────────────
 with tab_scores:

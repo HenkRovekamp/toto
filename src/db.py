@@ -172,18 +172,30 @@ GIRO_2025_STAGES = [
     ("Giro d'Italia", "31/05", "Sunday",    "Stage 21",      "Rome - Rome",                             131.0),
 ]
 
+BRABANTSE_PIJL_STAGES = [
+    ("De Brabantse Pijl", "17/04", "Thursday", "Stage 1", "Beersel - Overijse", 163.0),
+]
+
 
 def init_stages_table(db_path: str) -> None:
     conn = _connect(db_path)
     try:
         conn.execute(CREATE_STAGES_SQL)
-        existing = conn.execute(
+        existing_giro = conn.execute(
             "SELECT count(*) FROM stages WHERE race_name = 'Giro d''Italia'"
         ).fetchone()[0]
-        if existing == 0:
+        if existing_giro == 0:
             conn.executemany(
                 "INSERT INTO stages (race_name, date, day, stage_name, route, km) VALUES (?, ?, ?, ?, ?, ?)",
                 GIRO_2025_STAGES,
+            )
+        existing_bp = conn.execute(
+            "SELECT count(*) FROM stages WHERE race_name = 'De Brabantse Pijl'"
+        ).fetchone()[0]
+        if existing_bp == 0:
+            conn.executemany(
+                "INSERT INTO stages (race_name, date, day, stage_name, route, km) VALUES (?, ?, ?, ?, ?, ?)",
+                BRABANTSE_PIJL_STAGES,
             )
     finally:
         conn.close()
