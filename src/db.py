@@ -24,18 +24,11 @@ CREATE TABLE IF NOT EXISTS riders (
 )
 """
 
-UPSERT_SQL = """
+DELETE_RIDER_SQL = "DELETE FROM riders WHERE rider_url = ?"
+
+INSERT_RIDER_SQL = """
 INSERT INTO riders (rider_url, name, nationality, birthdate, height, weight, team_name, team_url, scraped_at)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, now())
-ON CONFLICT (rider_url) DO UPDATE SET
-    name        = excluded.name,
-    nationality = excluded.nationality,
-    birthdate   = excluded.birthdate,
-    height      = excluded.height,
-    weight      = excluded.weight,
-    team_name   = excluded.team_name,
-    team_url    = excluded.team_url,
-    scraped_at  = now()
 """
 
 
@@ -48,20 +41,19 @@ def init_db(db_path: str) -> duckdb.DuckDBPyConnection:
 
 
 def upsert_rider(conn: duckdb.DuckDBPyConnection, rider: dict) -> None:
-    """Insert or update a rider record."""
-    conn.execute(
-        UPSERT_SQL,
-        [
-            rider.get("rider_url"),
-            rider.get("name"),
-            rider.get("nationality"),
-            rider.get("birthdate"),
-            rider.get("height"),
-            rider.get("weight"),
-            rider.get("team_name"),
-            rider.get("team_url"),
-        ],
-    )
+    """Insert or update a rider record (delete+insert for MotherDuck compatibility)."""
+    values = [
+        rider.get("rider_url"),
+        rider.get("name"),
+        rider.get("nationality"),
+        rider.get("birthdate"),
+        rider.get("height"),
+        rider.get("weight"),
+        rider.get("team_name"),
+        rider.get("team_url"),
+    ]
+    conn.execute(DELETE_RIDER_SQL, [values[0]])
+    conn.execute(INSERT_RIDER_SQL, values)
 
 
 def rider_count(conn: duckdb.DuckDBPyConnection) -> int:
