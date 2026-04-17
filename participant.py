@@ -181,6 +181,8 @@ available = {
 
 if len(selected_urls) >= 15:
     st.info("Maximum van 15 renners bereikt.")
+elif not search_query:
+    st.caption("Zoek een renner via de zoekbalk hierboven.")
 elif available:
     add_label = st.selectbox(
         "Renner toevoegen",
@@ -192,7 +194,7 @@ elif available:
     if st.button("➕ Toevoegen", use_container_width=True, key="btn_add_rider"):
         st.session_state[state_key].append(available[add_label])
         st.rerun()
-elif search_query:
+else:
     st.caption("Geen renners gevonden voor deze zoekopdracht.")
 
 # ── Selected riders list ──────────────────────────────────────────────────────
