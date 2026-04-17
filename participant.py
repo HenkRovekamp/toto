@@ -26,11 +26,25 @@ if not DB_PATH.startswith("md:") and not os.path.exists(DB_PATH):
 init_fantasy_tables(DB_PATH)
 init_accounts_table(DB_PATH)
 
+# ── Auth: use st.user when available (Streamlit Cloud OAuth), else manual email ──
+_user = st.user if hasattr(st, "user") else None
+_cloud_email = getattr(_user, "email", None)
+_cloud_name = getattr(_user, "name", None)
+_is_guest = getattr(_user, "is_logged_in", None) is False or _cloud_email is None
+
 # ── Session state ─────────────────────────────────────────────────────────────
 if "account" not in st.session_state:
     st.session_state.account = None
 
-# ── Account login / registration ──────────────────────────────────────────────
+# ── Auto-login via Google (Streamlit Cloud) ───────────────────────────────────
+if not _is_guest and _cloud_email and st.session_state.account is None:
+    account = get_account_by_email(DB_PATH, _cloud_email)
+    if not account:
+        display_name = _cloud_name or _cloud_email.split("@")[0]
+        account = create_account(DB_PATH, _cloud_email, display_name)
+    st.session_state.account = account
+
+# ── Manual login / registration (local dev or guest) ─────────────────────────
 if st.session_state.account is None:
     st.subheader("Inloggen / registreren")
 
@@ -62,9 +76,13 @@ account = st.session_state.account
 
 col_welcome, col_logout = st.columns([4, 1])
 col_welcome.markdown(f"Ingelogd als **{account['name']}** ({account['email']})")
-if col_logout.button("Uitloggen"):
-    st.session_state.account = None
-    st.rerun()
+if not _is_guest:
+    # On Streamlit Cloud, logout is handled by the platform
+    col_logout.markdown("[Uitloggen](?logout=true)", unsafe_allow_html=False)
+else:
+    if col_logout.button("Uitloggen"):
+        st.session_state.account = None
+        st.rerun()
 
 st.divider()
 
