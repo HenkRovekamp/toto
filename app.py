@@ -9,7 +9,7 @@ from src.db import (
     init_stage_results_table, save_stage_results, load_stage_results, stages_with_results,
     calculate_scores, calculate_stage_breakdown,
     init_races_table, load_races, update_deadline,
-    init_accounts_table,
+    init_accounts_table, get_account_by_email, create_account,
 )
 
 load_dotenv()
@@ -22,8 +22,8 @@ else:
     DB_PATH = os.path.join(os.path.dirname(__file__), "data", "cycling.duckdb")
     _READ_ONLY = True
 
-st.set_page_config(page_title="Cyclist Explorer", page_icon="🚴", layout="wide")
-st.title("🚴 Professional Cyclist Explorer")
+st.set_page_config(page_title="Stampers Toto Administratie", page_icon="🚴", layout="wide")
+st.caption(f"Database contains **{total:,}** riders")
 
 
 def get_connection():
@@ -71,7 +71,40 @@ init_stage_results_table(DB_PATH)
 init_races_table(DB_PATH)
 init_accounts_table(DB_PATH)
 
-st.caption(f"Database contains **{total:,}** riders")
+# ── Admin login ───────────────────────────────────────────────────────────────
+_ADMIN_EMAILS = [
+    e.strip().lower()
+    for e in str(st.secrets.get("ADMIN_EMAILS", "") or os.getenv("ADMIN_EMAILS", "")).split(",")
+    if e.strip()
+]
+
+if "admin_account" not in st.session_state:
+    st.session_state.admin_account = None
+
+if st.session_state.admin_account is None:
+    st.title("🚴 Stampers Toto Administratie")
+    st.subheader("Inloggen")
+    _email = st.text_input("E-mailadres", placeholder="e.g. admin@example.com")
+    if not _email.strip():
+        st.stop()
+    if _ADMIN_EMAILS and _email.strip().lower() not in _ADMIN_EMAILS:
+        st.error("Geen toegang. Dit e-mailadres is niet geautoriseerd als beheerder.")
+        st.stop()
+    _acct = get_account_by_email(DB_PATH, _email.strip())
+    if not _acct:
+        _acct = create_account(DB_PATH, _email.strip(), _email.strip().split("@")[0])
+    if st.button("Doorgaan", use_container_width=True):
+        st.session_state.admin_account = _acct
+        st.rerun()
+    st.stop()
+
+_admin = st.session_state.admin_account
+_col_title, _col_logout = st.columns([5, 1])
+_col_title.title("🚴 Stampers Toto Administratie")
+if _col_logout.button("Uitloggen", key="admin_logout"):
+    st.session_state.admin_account = None
+    st.rerun()
+
 
 tab_explorer, tab_giro, tab_bp, tab_agr, tab_scores, tab_settings = st.tabs(["🔍 Explorer", "🏁 Giro d'Italia", "🚵 De Brabantse Pijl", "🌷 Amstel Gold Race", "🏆 Scores", "👥 Teams"])
 
