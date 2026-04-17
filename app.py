@@ -77,21 +77,21 @@ def _render_results_entry(race_name: str, stage_name: str, key_prefix: str):
     current = st.session_state[sk]
     label_list = [_NONE] + list(all_options.keys())
 
+    all_labels = [_NONE] + list(all_options.keys())
+
     for i in range(15):
-        already_picked = {current[j] for j in range(15) if j != i and current[j]}
-        filtered = [_NONE] + [lbl for lbl, url in all_options.items() if url not in already_picked]
         # Determine current selection label
         cur_url = current[i]
         cur_label = _NONE
         if cur_url:
             cur_label = next((lbl for lbl, url in all_options.items() if url == cur_url), _NONE)
-        cur_idx = filtered.index(cur_label) if cur_label in filtered else 0
+        cur_idx = all_labels.index(cur_label) if cur_label in all_labels else 0
 
         col_pos, col_sel = st.columns([1, 8])
         col_pos.markdown(f"**{_POSITIONS_NL[i]}**")
         chosen = col_sel.selectbox(
             f"Positie {i+1}",
-            options=filtered,
+            options=all_labels,
             index=cur_idx,
             key=f"{key_prefix}_pos_{i}_{stage_name}",
             label_visibility="collapsed",
@@ -101,11 +101,14 @@ def _render_results_entry(race_name: str, stage_name: str, key_prefix: str):
     st.session_state[sk] = current
 
     filled = [u for u in current if u]
-    st.caption(f"{len(filled)} / 15 posities ingevuld")
+    duplicates = len(filled) - len(set(filled))
+    st.caption(f"{len(filled)} / 15 posities ingevuld" + (f" — ⚠️ {duplicates} dubbele renner(s)" if duplicates else ""))
 
     if st.button("💾 Opslaan", use_container_width=True, key=f"{key_prefix}_save_{stage_name}"):
         if len(filled) != 15:
             st.error(f"Vul alle 15 posities in (nu {len(filled)}).")
+        elif len(set(filled)) != 15:
+            st.error("Elke renner mag maar één keer voorkomen. Verwijder duplicaten.")
         else:
             try:
                 save_stage_results(DB_PATH, race_name, stage_name, current)
