@@ -2,4 +2,4 @@
 
 | # | Status | Description |
 |---|--------|-------------|
-| 1 | 🔴 Open | Team kan nog gewijzigd worden na de deadline |
+| 1 | ✅ Fixed | Team kan nog gewijzigd worden na de deadline — deadline werd als UTC geïnterpreteerd i.p.v. lokale tijd |

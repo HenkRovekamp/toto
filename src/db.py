@@ -296,8 +296,10 @@ def is_registration_open(db_path: str, race_name: str) -> bool:
         ).fetchone()
         if not row or row[0] is None:
             return True
-        from datetime import datetime, timezone
-        return datetime.now(timezone.utc) < row[0].replace(tzinfo=timezone.utc)
+        from datetime import datetime
+        deadline = row[0] if isinstance(row[0], datetime) else datetime.fromisoformat(str(row[0]))
+        # Deadlines are stored and entered as local time; compare against local now()
+        return datetime.now() < deadline.replace(tzinfo=None)
     finally:
         conn.close()
 
