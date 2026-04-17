@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from src.db import (
     init_fantasy_tables, save_fantasy_team, load_fantasy_teams, load_fantasy_team_riders,
     init_stages_table, load_stages,
-    init_stage_results_table, save_stage_results, load_stage_results, stages_with_results,
+    init_stage_results_table, save_stage_results, delete_stage_results, load_stage_results, stages_with_results,
     calculate_scores, calculate_stage_breakdown,
     init_races_table, load_races, update_deadline,
     init_accounts_table, get_account_by_email, create_account,
@@ -113,6 +113,13 @@ def _render_results_entry(race_name: str, stage_name: str, key_prefix: str):
                 st.rerun()
             except Exception as exc:
                 st.error(f"Kon niet opslaan: {exc}")
+
+    if existing:
+        if st.button("🗑️ Uitslag verwijderen", use_container_width=True, key=f"{key_prefix}_delete_{stage_name}", type="secondary"):
+            delete_stage_results(DB_PATH, race_name, stage_name)
+            st.session_state.pop(sk, None)
+            st.success(f"Uitslag verwijderd voor **{stage_name}**.")
+            st.rerun()
 
 
 def load_data(name_filter, nationality_filter, team_filter):

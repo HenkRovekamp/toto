@@ -438,6 +438,17 @@ def save_stage_results(db_path: str, race_name: str, stage_name: str, rider_urls
         conn.close()
 
 
+def delete_stage_results(db_path: str, race_name: str, stage_name: str) -> None:
+    conn = _connect(db_path)
+    try:
+        conn.execute(
+            "DELETE FROM stage_results WHERE race_name = ? AND stage_name = ?",
+            [race_name, stage_name],
+        )
+    finally:
+        conn.close()
+
+
 def load_stage_results(db_path: str, race_name: str, stage_name: str) -> list[dict]:
     conn = _connect(db_path, read_only=True)
     try:
@@ -494,9 +505,10 @@ def calculate_scores(db_path: str, race_name: str) -> list[dict]:
             pts = STAGE_POINTS.get(position, 0)
             rider_stage_points.setdefault(rider_url, {})[stage_name] = pts
 
-        # All fantasy teams and their riders
+        # All fantasy teams for this race and their riders
         teams = conn.execute(
-            "SELECT id, manager_name, team_name FROM fantasy_teams ORDER BY id"
+            "SELECT id, manager_name, team_name FROM fantasy_teams WHERE race_name = ? OR race_name IS NULL ORDER BY id",
+            [race_name],
         ).fetchall()
 
         team_riders = conn.execute(
