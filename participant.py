@@ -111,7 +111,7 @@ if race_info["deadline"]:
 
 # ── Load all riders ───────────────────────────────────────────────────────────
 @st.cache_data(ttl=300)
-def get_rider_options():
+def _load_rider_rows():
     conn = _connect(DB_PATH, read_only=True)
     try:
         df = conn.execute(
@@ -119,13 +119,19 @@ def get_rider_options():
         ).df()
     finally:
         conn.close()
-    return {
-        f"{row['name']} ({row['nationality'] or '?'}) \u2014 {row['team_name'] or '?'}": row["rider_url"]
-        for _, row in df.iterrows()
-    }
+    return list(df.itertuples(index=False, name=None))
 
-rider_options = get_rider_options()
-url_to_label = {v: k for k, v in rider_options.items()}
+_rider_rows = _load_rider_rows()  # list of (url, name, nationality, team_name)
+
+# Build lookups fresh every run (no stale cache issues with _normalize)
+rider_options = {}   # label -> url
+url_to_label = {}    # url -> label
+_url_to_norm = {}    # url -> normalized name
+for _url, _name, _nat, _team in _rider_rows:
+    _label = f"{_name} ({_nat or '?'}) \u2014 {_team or '?'}"
+    rider_options[_label] = _url
+    url_to_label[_url] = _label
+    _url_to_norm[_url] = _normalize(_name)
 
 # ── Team form ─────────────────────────────────────────────────────────────────
 if not registration_open:
@@ -164,12 +170,12 @@ st.markdown(f"**Renners selecteren** — {len(selected_urls)} / 15 geselecteerd"
 search_query = st.text_input("🔍 Zoek renner", placeholder="Typ naam...", key="rider_search")
 
 # Filter rider options by search query (name only, accent-insensitive), exclude already selected
-_norm_query = _normalize(search_query)
+_norm_query = _normalize(search_query) if search_query else ""
 available = {
     label: url
     for label, url in rider_options.items()
     if url not in selected_urls and (
-        not search_query or _norm_query in _normalize(label.split(" (")[0])
+        not search_query or _norm_query in _url_to_norm.get(url, "")
     )
 }
 
