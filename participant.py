@@ -183,9 +183,14 @@ if len(selected_urls) >= 15:
 elif not search_query:
     st.caption("Zoek een renner via de zoekbalk hierboven.")
 elif available:
-    add_label = st.selectbox(
+    _available_items = list(available.items())
+    if len(_available_items) > 20:
+        st.caption(f"Meer dan 20 resultaten ({len(_available_items)}) — verfijn je zoekopdracht.")
+        _available_items = _available_items[:20]
+    _available_labels = [label for label, _ in _available_items]
+    add_label = st.radio(
         "Renner toevoegen",
-        options=list(available.keys()),
+        options=_available_labels,
         index=0,
         key="rider_add_select",
         label_visibility="collapsed",
