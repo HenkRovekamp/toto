@@ -63,9 +63,8 @@ if st.session_state.account is None:
 
     if account:
         st.success(f"Welkom terug, **{account['name']}**!")
-        if st.button("Doorgaan", use_container_width=True):
-            st.session_state.account = account
-            st.rerun()
+        st.session_state.account = account
+        st.rerun()
     else:
         st.info("Nog geen account. Voer je naam in om je te registreren.")
         name_input = st.text_input("Jouw naam", placeholder="e.g. Johan")
