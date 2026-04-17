@@ -29,6 +29,92 @@ def get_connection():
     return duckdb.connect(DB_PATH, read_only=_READ_ONLY)
 
 
+# ── Shared: rider options (cached) ───────────────────────────────────────────
+@st.cache_data(ttl=300)
+def _get_all_rider_rows():
+    conn = get_connection()
+    try:
+        return conn.execute(
+            "SELECT rider_url, name, nationality, team_name FROM riders WHERE name IS NOT NULL ORDER BY name"
+        ).fetchall()
+    finally:
+        conn.close()
+
+
+# ── Shared: positional results entry UI ─────────────────────────────────────
+_POSITIONS_NL = ["1e", "2e", "3e", "4e", "5e", "6e", "7e", "8e", "9e", "10e",
+                 "11e", "12e", "13e", "14e", "15e"]
+_NONE = "— niet geselecteerd —"
+
+def _render_results_entry(race_name: str, stage_name: str, key_prefix: str):
+    """Render 15 positional selectboxes for entering stage results."""
+    rider_rows = _get_all_rider_rows()
+    url_to_name = {url: name for url, name, _, _ in rider_rows}
+    # label -> url
+    all_options = {
+        f"{name} ({nat or '?'}) — {team or '?'}": url
+        for url, name, nat, team in rider_rows
+    }
+
+    # Load existing results to pre-fill
+    existing = load_stage_results(DB_PATH, race_name, stage_name)
+    prefill_urls = [None] * 15
+    if existing:
+        _url_by_name = {name: url for url, name, _, _ in rider_rows}
+        for r in existing:
+            idx = r["Pos"] - 1
+            if 0 <= idx < 15:
+                prefill_urls[idx] = _url_by_name.get(r["Rider"])
+
+    if existing:
+        st.info(f"Resultaten al opgeslagen voor **{stage_name}** — opslaan overschrijft.")
+
+    # Session state key for current selections
+    sk = f"results_{key_prefix}_{stage_name}"
+    if sk not in st.session_state:
+        st.session_state[sk] = [url for url in prefill_urls]
+
+    current = st.session_state[sk]
+    label_list = [_NONE] + list(all_options.keys())
+
+    for i in range(15):
+        already_picked = {current[j] for j in range(15) if j != i and current[j]}
+        filtered = [_NONE] + [lbl for lbl, url in all_options.items() if url not in already_picked]
+        # Determine current selection label
+        cur_url = current[i]
+        cur_label = _NONE
+        if cur_url:
+            cur_label = next((lbl for lbl, url in all_options.items() if url == cur_url), _NONE)
+        cur_idx = filtered.index(cur_label) if cur_label in filtered else 0
+
+        col_pos, col_sel = st.columns([1, 8])
+        col_pos.markdown(f"**{_POSITIONS_NL[i]}**")
+        chosen = col_sel.selectbox(
+            f"Positie {i+1}",
+            options=filtered,
+            index=cur_idx,
+            key=f"{key_prefix}_pos_{i}_{stage_name}",
+            label_visibility="collapsed",
+        )
+        current[i] = all_options.get(chosen)
+
+    st.session_state[sk] = current
+
+    filled = [u for u in current if u]
+    st.caption(f"{len(filled)} / 15 posities ingevuld")
+
+    if st.button("💾 Opslaan", use_container_width=True, key=f"{key_prefix}_save_{stage_name}"):
+        if len(filled) != 15:
+            st.error(f"Vul alle 15 posities in (nu {len(filled)}).")
+        else:
+            try:
+                save_stage_results(DB_PATH, race_name, stage_name, current)
+                st.success(f"Resultaten opgeslagen voor **{stage_name}**!")
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Kon niet opslaan: {exc}")
+
+
 def load_data(name_filter, nationality_filter, team_filter):
     query = "SELECT * FROM riders WHERE 1=1"
     params = []
@@ -304,65 +390,17 @@ with tab_bp:
 
     with sub_bp_enter:
         if bp_stage_names:
-            bp_selected = st.selectbox("Select stage", bp_stage_names, key="bp_result_stage")
-            bp_existing = load_stage_results(DB_PATH, "De Brabantse Pijl", bp_selected)
-
-            _conn_bp = get_connection()
-            bp_riders_df = _conn_bp.execute(
-                "SELECT rider_url, name, nationality, team_name FROM riders WHERE name IS NOT NULL ORDER BY name"
-            ).df()
-            _conn_bp.close()
-
-            bp_rider_options = {
-                f"{row['name']} ({row['nationality'] or '?'}) — {row['team_name'] or '?'}": row["rider_url"]
-                for _, row in bp_riders_df.iterrows()
-            }
-            bp_url_to_label = {v: k for k, v in bp_rider_options.items()}
-
-            bp_prefill = []
-            if bp_existing:
-                _conn_pre2 = get_connection()
-                url_map2 = {row[0]: row[1] for row in _conn_pre2.execute("SELECT name, rider_url FROM riders").fetchall()}
-                _conn_pre2.close()
-                bp_prefill = [
-                    bp_url_to_label[u] for r in bp_existing
-                    if (u := next((v for n, v in url_map2.items() if n == r["Rider"]), None)) and u in bp_url_to_label
-                ]
-
-            if bp_existing:
-                st.info(f"Results already saved for **{bp_selected}** — editing will overwrite.")
-
-            with st.form("bp_results_form"):
-                st.markdown("Add riders **in finishing order** (1st → 15th).")
-                bp_top15 = st.multiselect(
-                    "Top 15 finishers",
-                    options=list(bp_rider_options.keys()),
-                    default=bp_prefill,
-                    max_selections=15,
-                    placeholder="Type a name to search...",
-                )
-                bp_save = st.form_submit_button("💾 Save Results", use_container_width=True)
-
-            if bp_save:
-                if len(bp_top15) != 15:
-                    st.error(f"Select exactly 15 finishers (currently {len(bp_top15)}).")
-                else:
-                    urls = [bp_rider_options[lbl] for lbl in bp_top15]
-                    try:
-                        save_stage_results(DB_PATH, "De Brabantse Pijl", bp_selected, urls)
-                        st.success(f"Results saved for **{bp_selected}**!")
-                        st.rerun()
-                    except Exception as exc:
-                        st.error(f"Could not save results: {exc}")
+            bp_selected = st.selectbox("Etappe", bp_stage_names, key="bp_result_stage")
+            _render_results_entry("De Brabantse Pijl", bp_selected, "bp")
 
     with sub_bp_view:
         if bp_stage_names:
-            bp_view_stage = st.selectbox("Select stage", bp_stage_names, key="bp_view_stage")
+            bp_view_stage = st.selectbox("Etappe", bp_stage_names, key="bp_view_stage")
             bp_results = load_stage_results(DB_PATH, "De Brabantse Pijl", bp_view_stage)
             if bp_results:
                 st.dataframe(pd.DataFrame(bp_results), hide_index=True, width="stretch")
             else:
-                st.info("No results entered yet.")
+                st.info("Nog geen uitslag ingevoerd.")
 
     # ── Registration deadline ──────────────────────────────────────────────────
     st.divider()
@@ -392,65 +430,17 @@ with tab_agr:
 
     with sub_agr_enter:
         if agr_stage_names:
-            agr_selected = st.selectbox("Select stage", agr_stage_names, key="agr_result_stage")
-            agr_existing = load_stage_results(DB_PATH, "Amstel Gold Race", agr_selected)
-
-            _conn_agr = get_connection()
-            agr_riders_df = _conn_agr.execute(
-                "SELECT rider_url, name, nationality, team_name FROM riders WHERE name IS NOT NULL ORDER BY name"
-            ).df()
-            _conn_agr.close()
-
-            agr_rider_options = {
-                f"{row['name']} ({row['nationality'] or '?'}) — {row['team_name'] or '?'}": row["rider_url"]
-                for _, row in agr_riders_df.iterrows()
-            }
-            agr_url_to_label = {v: k for k, v in agr_rider_options.items()}
-
-            agr_prefill = []
-            if agr_existing:
-                _conn_pre3 = get_connection()
-                url_map3 = {row[0]: row[1] for row in _conn_pre3.execute("SELECT name, rider_url FROM riders").fetchall()}
-                _conn_pre3.close()
-                agr_prefill = [
-                    agr_url_to_label[u] for r in agr_existing
-                    if (u := next((v for n, v in url_map3.items() if n == r["Rider"]), None)) and u in agr_url_to_label
-                ]
-
-            if agr_existing:
-                st.info(f"Results already saved for **{agr_selected}** — editing will overwrite.")
-
-            with st.form("agr_results_form"):
-                st.markdown("Add riders **in finishing order** (1st → 15th).")
-                agr_top15 = st.multiselect(
-                    "Top 15 finishers",
-                    options=list(agr_rider_options.keys()),
-                    default=agr_prefill,
-                    max_selections=15,
-                    placeholder="Type a name to search...",
-                )
-                agr_save = st.form_submit_button("💾 Save Results", use_container_width=True)
-
-            if agr_save:
-                if len(agr_top15) != 15:
-                    st.error(f"Select exactly 15 finishers (currently {len(agr_top15)}).")
-                else:
-                    urls = [agr_rider_options[lbl] for lbl in agr_top15]
-                    try:
-                        save_stage_results(DB_PATH, "Amstel Gold Race", agr_selected, urls)
-                        st.success(f"Results saved for **{agr_selected}**!")
-                        st.rerun()
-                    except Exception as exc:
-                        st.error(f"Could not save results: {exc}")
+            agr_selected = st.selectbox("Etappe", agr_stage_names, key="agr_result_stage")
+            _render_results_entry("Amstel Gold Race", agr_selected, "agr")
 
     with sub_agr_view:
         if agr_stage_names:
-            agr_view_stage = st.selectbox("Select stage", agr_stage_names, key="agr_view_stage")
+            agr_view_stage = st.selectbox("Etappe", agr_stage_names, key="agr_view_stage")
             agr_results = load_stage_results(DB_PATH, "Amstel Gold Race", agr_view_stage)
             if agr_results:
                 st.dataframe(pd.DataFrame(agr_results), hide_index=True, width="stretch")
             else:
-                st.info("No results entered yet.")
+                st.info("Nog geen uitslag ingevoerd.")
 
     # ── Registration deadline ──────────────────────────────────────────────────
     st.divider()
