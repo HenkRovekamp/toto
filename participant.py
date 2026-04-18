@@ -186,7 +186,11 @@ if free_text.strip():
                 extracted = []
         if extracted:
             matched_urls, not_found = match_riders_to_db(extracted, DB_PATH)
-            st.session_state[state_key] = matched_urls
+            existing = st.session_state[state_key]
+            already_in = set(existing)
+            new_urls = [u for u in matched_urls if u not in already_in]
+            slots_left = 15 - len(existing)
+            st.session_state[state_key] = existing + new_urls[:slots_left]
             if not_found:
                 st.warning(
                     f"{len(not_found)} renner(s) niet gevonden in de database: "
