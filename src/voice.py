@@ -3,6 +3,8 @@ import json
 import unicodedata
 import logging
 
+from mistralai import Mistral
+
 logger = logging.getLogger(__name__)
 
 MISTRAL_MODEL = os.getenv("MISTRAL_MODEL", "mistral-large-latest")
@@ -37,11 +39,6 @@ def extract_riders_from_text(text: str) -> list[str]:
     api_key = os.getenv("MISTRAL_API_KEY")
     if not api_key:
         raise RuntimeError("MISTRAL_API_KEY is not set. Add it to your .env or Streamlit secrets.")
-
-    try:
-        from mistralai import Mistral
-    except ImportError:
-        raise RuntimeError("The 'mistralai' package is not installed. Run: pip install mistralai")
 
     client = Mistral(api_key=api_key)
     response = client.chat.complete(
