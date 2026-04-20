@@ -7,7 +7,7 @@ and save them to the stage_results table.
 
 Usage:
     python fetch_stage_results.py "giro-d-italia/2026" [--stages 1-21]
-    python fetch_stage_results.py "tour-de-france/2025/stage-1/result"
+    python fetch_stage_results.py "tour-de-france/2026/stage-1/result"
 """
 
 import sys

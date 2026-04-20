@@ -419,7 +419,7 @@ CREATE TABLE IF NOT EXISTS stages (
 )
 """
 
-GIRO_2025_STAGES = [
+GIRO_2026_STAGES = [
     ("Giro d'Italia", "08/05", "Friday",    "Stage 1",       "Nessebar - Burgas",                       156.0),
     ("Giro d'Italia", "09/05", "Saturday",  "Stage 2",       "Burgas - Valiko Tarnovo",                 220.0),
     ("Giro d'Italia", "10/05", "Sunday",    "Stage 3",       "Plovdiv - Sofia",                         174.0),
@@ -520,7 +520,7 @@ def init_stages_table(db_path: str) -> None:
         if existing_giro == 0:
             conn.executemany(
                 "INSERT INTO stages (race_name, date, day, stage_name, route, km, pcs_url) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                [(r[0], r[1], r[2], r[3], r[4], r[5], None) for r in GIRO_2025_STAGES],
+                [(r[0], r[1], r[2], r[3], r[4], r[5], None) for r in GIRO_2026_STAGES],
             )
         existing_tdf = conn.execute(
             "SELECT count(*) FROM stages WHERE race_name = 'Tour de France'"

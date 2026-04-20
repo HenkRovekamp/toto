@@ -8,7 +8,7 @@ Usage:
     (then enter the URL when prompted)
 
 Or with command line argument:
-    python race_result_scraper.py "race/amstel-gold-race/2025/result"
+    python race_result_scraper.py "race/amstel-gold-race/2026/result"
 """
 
 import sys
@@ -109,8 +109,8 @@ def main():
     print("ProCyclingStats Race Result Scraper")
     print("=" * 60)
     print("\nEnter a race result URL from ProCyclingStats")
-    print("Example: race/amstel-gold-race/2025/result")
-    print("         or: https://www.procyclingstats.com/race/tour-de-france/2025/stage-1/result")
+    print("Example: race/amstel-gold-race/2026/result")
+    print("         or: https://www.procyclingstats.com/race/tour-de-france/2026/stage-1/result")
     print()
     
     # Get URL from command line or input
