@@ -333,6 +333,7 @@ if _admin and _admin.get("email"):
             help=t("participant_help"),
             width="stretch"
         )
+        
 
 if _col_logout.button(t("logout"), key="admin_logout"):
     st.session_state.admin_account = None
