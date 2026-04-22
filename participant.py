@@ -180,6 +180,9 @@ account = st.session_state.account
 # ── Sidebar: User info ──────────────────────────────────────────────────────
 st.sidebar.markdown("---")
 
+# "Ingelogd als" label
+st.sidebar.markdown(f"**{t('participant_logged_in')}**")
+
 # Clickable username to open name change popup
 if st.sidebar.button(
     f"👤 **{account['name']}**", 
