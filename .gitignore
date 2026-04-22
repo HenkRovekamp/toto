@@ -56,3 +56,4 @@ data/*.db
 pdfs/
 
 .vibe.md
+unused_analysis.md
