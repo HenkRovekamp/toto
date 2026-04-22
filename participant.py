@@ -61,7 +61,19 @@ def t(key):
     """Translate a key to the current language"""
     return TRANSLATIONS[st.session_state.language].get(key, key)
 
-st.title(f"🚴 {t('participant_welcome')}")
+# Title with logout button on the right
+col_title, col_logout_header = st.columns([4, 1])
+with col_title:
+    st.title(f"🚴 {t('participant_welcome')}")
+
+with col_logout_header:
+    if not _is_guest:
+        # On Streamlit Cloud, logout is handled by the platform
+        st.markdown("[🚪](?logout=true)", unsafe_allow_html=True)
+    else:
+        if st.button("🚪", key="btn_logout_header", help="Uitloggen"):
+            st.session_state.account = None
+            st.rerun()
 
 if not DB_PATH.startswith("md:") and not os.path.exists(DB_PATH):
     st.error("Database not found. Ask the administrator to run the scraper first.")
@@ -168,6 +180,9 @@ account = st.session_state.account
 # ── Sidebar: User info ──────────────────────────────────────────────────────
 st.sidebar.markdown("---")
 
+# "Ingelogd als" label
+st.sidebar.markdown(f"**{t('participant_logged_in')}**")
+
 # Clickable username to open name change popup
 if st.sidebar.button(
     f"👤 **{account['name']}**", 
@@ -206,18 +221,6 @@ if st.session_state.get("show_change_name", False):
             st.rerun()
         else:
             st.error(t("participant_name_change_error"))
-
-st.divider()
-
-# Logout button in main content - aligned to the right
-col_logout_main = st.columns([1])[0]
-if not _is_guest:
-    # On Streamlit Cloud, logout is handled by the platform
-    col_logout_main.markdown("[🚪 Uitloggen](?logout=true)", unsafe_allow_html=True)
-else:
-    if col_logout_main.button("🚪 Uitloggen", key="btn_logout", help="Uitloggen"):
-        st.session_state.account = None
-        st.rerun()
 
 st.divider()
 
