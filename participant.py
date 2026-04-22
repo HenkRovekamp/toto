@@ -211,6 +211,41 @@ if st.session_state.get("show_change_name", False):
         background-color: rgba(0, 0, 0, 0.5);
         z-index: 9999;
     }
+    body.modal-open {
+        overflow: hidden;
+    }
+    .modal-container {
+        position: relative;
+        z-index: 10000;
+    }
+    </style>
+    <script>
+    // Try to prevent scrolling when modal is open
+    document.body.style.overflow = 'hidden';
+    </script>
+=======
+    <style>
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 9999;
+    }
+    body.modal-open {
+        overflow: hidden;
+    }
+    .modal-container {
+        position: relative;
+        z-index: 10000;
+    }
+    </style>
+    <script>
+    // Try to prevent scrolling when modal is open
+    document.body.style.overflow = 'hidden';
+    </script>
     .modal-container {
         position: fixed;
         top: 50%;
