@@ -2,6 +2,7 @@
 import json
 import re
 import unicodedata
+import urllib.parse
 import pandas as pd
 import streamlit as st
 from dotenv import load_dotenv
@@ -61,7 +62,25 @@ def t(key):
     """Translate a key to the current language"""
     return TRANSLATIONS[st.session_state.language].get(key, key)
 
-st.title(f"🚴 {t('participant_welcome')}")
+# Create columns for title and login button
+col_title, col_login = st.columns([4, 1])
+with col_title:
+    st.title(f"🚴 {t('participant_welcome')}")
+
+# Add login button in the header (only after session state is initialized)
+with col_login:
+    # Check if account is in session state, if not, user is not logged in
+    if "account" not in st.session_state or st.session_state.account is None:
+        if st.button("🚪 Inloggen", key="btn_login_header", help="Inloggen"):
+            # Scroll to login section
+            st.markdown(
+                """
+                <script>
+                    document.querySelector('[data-testid="stTextInput"]').scrollIntoView();
+                </script>
+                """,
+                unsafe_allow_html=True
+            )
 
 if not DB_PATH.startswith("md:") and not os.path.exists(DB_PATH):
     st.error("Database not found. Ask the administrator to run the scraper first.")
@@ -86,10 +105,34 @@ if "participant_view" not in st.session_state:
 
 # Add logout button in header (after _is_guest is defined)
 if st.session_state.account is not None:
-    col_title, col_logout_header = st.columns([4, 1])
+    # Create columns for title, admin button, and logout button
+    col_title, col_admin, col_logout_header = st.columns([3, 1, 1])
     with col_title:
         # Title was already set above, just add spacing
         st.write("")  # Add some space
+    
+    # Add admin button if user is admin
+    with col_admin:
+        account = st.session_state.account
+        if account.get("is_admin") == "yes":
+            # Use the fixed admin URL
+            admin_url = "https://stamperstoto.streamlit.app/"
+            admin_params = {
+                "email": account["email"],
+            }
+            
+            full_admin_url = f"{admin_url}?{urllib.parse.urlencode(admin_params)}"
+            
+            # Use st.link_button for better styling (Streamlit 1.25+)
+            if hasattr(st, 'link_button'):
+                st.link_button("👑 Admin", full_admin_url, help="Naar admin paneel", use_container_width=True)
+            else:
+                st.markdown(
+                    f'[👑 Admin]({full_admin_url})',
+                    unsafe_allow_html=True,
+                    help="Naar admin paneel"
+                )
+    
     with col_logout_header:
         if not _is_guest:
             # On Streamlit Cloud, logout is handled by the platform
