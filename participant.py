@@ -225,15 +225,21 @@ if st.session_state.get("show_change_name", False):
         st.rerun()
     
     if col2.button(t("participant_save"), type="primary", use_container_width=True) and new_name.strip() and len(new_name.strip()) <= 50:
-        success = update_account_name(DB_PATH, account["id"], new_name.strip())
-        if success:
-            account["name"] = new_name.strip()
-            st.session_state.account = account
-            st.success(t("participant_name_changed_success"))
-            st.session_state.show_change_name = False
-            st.rerun()
+        # Check if name is actually different
+        if new_name.strip() == account.get("name"):
+            st.error(t("participant_name_same"))
         else:
-            st.error(t("participant_name_change_error"))
+            print(f"Attempting to update account {account['id']} with name: {new_name.strip()}")
+            success = update_account_name(DB_PATH, account["id"], new_name.strip())
+            print(f"Update result: {success}")
+            if success:
+                account["name"] = new_name.strip()
+                st.session_state.account = account
+                st.success(t("participant_name_changed_success"))
+                st.session_state.show_change_name = False
+                st.rerun()
+            else:
+                st.error(t("participant_name_change_error") + f" (ID: {account['id']})")
     
     st.markdown('</div>', unsafe_allow_html=True)
 
