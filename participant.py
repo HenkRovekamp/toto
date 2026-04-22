@@ -99,17 +99,6 @@ if st.session_state.account is not None:
                 st.session_state.account = None
                 st.rerun()
 
-# ── Language Selector (Sidebar - At Top) ──────────────────────────────────────
-st.sidebar.selectbox(
-    t("language"),
-    options=["nl", "en"],
-    index=0 if st.session_state.language == "nl" else 1,
-    format_func=lambda x: "🇳🇱 Nederlands" if x == "nl" else "🇬🇧 English",
-    key="lang_selector",
-    on_change=lambda: st.session_state.update({"language": st.session_state.lang_selector}),
-    label_visibility="visible"
-)
-
 # ── Auto-login via URL parameter (from admin app) ──────────────────────────────
 query_params = st.query_params
 auto_login_email = query_params.get("email")
@@ -181,10 +170,9 @@ if st.session_state.account is None:
 account = st.session_state.account
 
 # ── Sidebar: User info ──────────────────────────────────────────────────────
-st.sidebar.markdown("---")
 
 # "Ingelogd als" label
-st.sidebar.markdown(f"**{t('participant_logged_in')}**")
+st.sidebar.markdown(f"<center><b>{t('participant_logged_in')}</b></center>", unsafe_allow_html=True)
 
 # Clickable username to open name change popup
 if st.sidebar.button(
@@ -195,6 +183,7 @@ if st.sidebar.button(
 ):
     st.session_state.show_change_name = True
 
+st.sidebar.markdown("---")
 
 if st.session_state.get("show_change_name", False):
     # Full overlay to block the rest of the website
@@ -592,4 +581,16 @@ elif view == "scores":
                     st.info("No scores available yet.")
             except Exception as e:
                 st.error(f"Error loading scores: {e}")
+
+# ── Language Selector (Sidebar - At Bottom) ──────────────────────────────────
+st.sidebar.markdown("---")
+st.sidebar.selectbox(
+    t("language"),
+    options=["nl", "en"],
+    index=0 if st.session_state.language == "nl" else 1,
+    format_func=lambda x: "🇳🇱 Nederlands" if x == "nl" else "🇬🇧 English",
+    key="lang_selector",
+    on_change=lambda: st.session_state.update({"language": st.session_state.lang_selector}),
+    label_visibility="visible"
+)
 
