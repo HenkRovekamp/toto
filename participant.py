@@ -9,89 +9,27 @@ from dotenv import load_dotenv
 from src.db import (
     init_fantasy_tables, init_accounts_table,
     save_fantasy_team, load_team_by_account,
-    get_account_by_email, create_account,
     _connect, load_races, is_registration_open,
     load_stages, load_stage_results, calculate_scores,
     update_account_name,
 )
 from src.voice import extract_riders_from_text, match_riders_to_db
-
-
-def _normalize(text: str) -> str:
-    """Lowercase + strip diacritics so 'pogacar' matches 'Pogačar'."""
-    return unicodedata.normalize("NFD", text.lower()).encode("ascii", "ignore").decode("ascii")
-
-load_dotenv()
+from login import get_account, t, DB_PATH, get_is_guest
 
 # ── Load Translations from JSON ──────────────────────────────────────────────
 with open("translations.json", "r", encoding="utf-8") as f:
     TRANSLATIONS = json.load(f)
 
-try:
-    _TOKEN = os.getenv("MOTHERDUCK_TOKEN") or st.secrets.get("MOTHERDUCK_TOKEN", "")
-except Exception:
-    _TOKEN = os.getenv("MOTHERDUCK_TOKEN", "")
-if _TOKEN:
-    DB_PATH = f"md:toto?motherduck_token={_TOKEN}"
-else:
-    DB_PATH = os.path.join(os.path.dirname(__file__), "data", "cycling.duckdb")
-
-st.set_page_config(page_title="Stampers Toto", page_icon="🚴", layout="centered")
-
-# ── Custom CSS for Fixed Footer Language Selector ──────────────────────────
-st.markdown("""
-    <style>
-    .footer {
-        position: fixed;
-        bottom: 0;
-        right: 0;
-        width: auto;
-        padding: 12px 20px;
-        background-color: rgba(255, 255, 255, 0.95);
-        border-top: 1px solid #e0e0e0;
-        z-index: 999;
-    }
-    </style>
-""", unsafe_allow_html=True)
-
 # ── Initialize Language ──────────────────────────────────────────────────────
 if "language" not in st.session_state:
     st.session_state.language = "nl"
-
-def t(key):
-    """Translate a key to the current language"""
-    return TRANSLATIONS[st.session_state.language].get(key, key)
-
-# Create columns for title and login button
-col_title, col_login = st.columns([4, 1])
-with col_title:
-    st.title(f"🚴 {t("participant_welcome")}")
-
-# Remove login button from header as it's not needed
-with col_login:
-    st.write("")  # Empty space to maintain layout
-if not DB_PATH.startswith("md:") and not os.path.exists(DB_PATH):
-    st.error("Database not found. Ask the administrator to run the scraper first.")
-    st.stop()
-
-init_fantasy_tables(DB_PATH)
-init_accounts_table(DB_PATH)
-
-# ── Auth: use st.user when available (Streamlit Cloud OAuth), else manual email ──
-_user = st.user if hasattr(st, "user") else None
-_cloud_email = getattr(_user, "email", None)
-_cloud_name = getattr(_user, "name", None)
-_is_guest = getattr(_user, "is_logged_in", None) is False or _cloud_email is None
-
-# ── Session state ─────────────────────────────────────────────────────────────
-if "account" not in st.session_state:
-    st.session_state.account = None
 
 # ── Initialize view state ──────────────────────────────────────────────────────
 if "participant_view" not in st.session_state:
     st.session_state.participant_view = "register"
 
 # Add logout button in header (after _is_guest is defined)
+_is_guest = get_is_guest()
 if st.session_state.account is not None:
     # Create columns for title, admin button, and logout button
     col_title, col_admin, col_logout_header = st.columns([3, 1, 1])
@@ -107,9 +45,9 @@ if st.session_state.account is not None:
             admin_url = "https://stamperstoto.streamlit.app/"
             admin_params = {
                 "email": account["email"],
-            }
+            } 
             
-            full_admin_url = f"{admin_url}?{urllib.parse.urlencode(admin_params)}"
+            full_admin_url = f"{admin_url}?{urllib.parse.urlencode(admin_params)}" 
             
             # Use st.link_button for better styling (Streamlit 1.25+)
             # Note: st.link_button opens in same tab by default
@@ -130,73 +68,6 @@ if st.session_state.account is not None:
             if st.button("🚪 Uitloggen", key="btn_logout_header", help="Uitloggen"):
                 st.session_state.account = None
                 st.rerun()
-
-# ── Auto-login via URL parameter (from admin app) ──────────────────────────────
-query_params = st.query_params
-auto_login_email = query_params.get("email")
-auto_login_flag = query_params.get("auto_login")
-
-if auto_login_email and auto_login_flag == "true" and st.session_state.account is None:
-    account = get_account_by_email(DB_PATH, auto_login_email)
-    if account:
-        st.session_state.account = account
-        # Clear the query params from the URL for clean display
-        st.query_params.clear()
-        st.rerun()
-
-# ── Auto-login via environment variable ──────────────────────────────────────
-if st.session_state.account is None:
-    env_auto_login_email = os.getenv("PARTICIPANT_AUTO_LOGIN_EMAIL")
-    if env_auto_login_email:
-        account = get_account_by_email(DB_PATH, env_auto_login_email)
-        if account:
-            st.session_state.account = account
-            st.rerun()
-
-# ── Auto-login via Google (Streamlit Cloud OAuth), else manual email ──────────
-if not _is_guest and _cloud_email and st.session_state.account is None:
-    account = get_account_by_email(DB_PATH, _cloud_email)
-    if not account:
-        display_name = _cloud_name or _cloud_email.split("@")[0]
-        account = create_account(DB_PATH, _cloud_email, display_name)
-    st.session_state.account = account
-
-# ── Manual login / registration (local dev or guest) ─────────────────────────
-if st.session_state.account is None:
-    st.subheader(t("participant_login_register"))
-
-    email_input = st.text_input(t("email"), placeholder="e.g. johan@example.com")
-
-    if not email_input.strip():
-        st.stop()
-
-    # Validate email format
-    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    if not re.match(email_pattern, email_input.strip()):
-        st.error(t("participant_invalid_email"))
-        st.stop()
-
-    account = get_account_by_email(DB_PATH, email_input.strip())
-
-    if account:
-        st.success(f"{t('participant_welcome_back')}, **{account['name']}**!")
-        st.session_state.account = account
-        st.rerun()
-    else:
-        st.info(t("participant_no_account"))
-        name_input = st.text_input(t("participant_your_name"), placeholder="e.g. Johan (max 50 chars)", key="name_input")
-        
-        # Real-time validation for username length
-        if name_input.strip() and len(name_input.strip()) > 50:
-            st.error(t("participant_error_username_length"))
-        
-        if name_input.strip() and len(name_input.strip()) <= 50:
-            if st.button(t("participant_create_account"), width="stretch"):
-                account = create_account(DB_PATH, email_input.strip(), name_input.strip())
-                st.session_state.account = account
-                st.rerun()
-
-    st.stop()
 
 # ── Logged in ─────────────────────────────────────────────────────────────────
 account = st.session_state.account
@@ -348,7 +219,7 @@ url_to_label = {}    # url -> label
 _url_to_norm = {}    # url -> normalized name
 _selected_set = set()  # for fast O(1) lookup later
 for _url, _name, _nickname, _nat, _team in _rider_rows:
-    _label = f"{_name} ({_nat or '?'})  {_team or '?'}" + (f" [{_nickname}]" if _nickname else "")
+    _label = f"{_name} ({_nat or '?'}) 德华 {_team or '?'}" + (f" [{_nickname}]" if _nickname else "")
     rider_options[_label] = _url
     url_to_label[_url] = _label
     _url_to_norm[_url] = _normalize(_name)
@@ -534,7 +405,7 @@ if view == "register":
             for _url, _name, _nickname, _nat, _team in all_rider_rows:
                 # Only include riders that are NOT in the startlist
                 if _url not in startlist_rider_urls:
-                    _label = f"{_name} ({_nat or '?'})  {_team or '?'}" + (f" [{_nickname}]" if _nickname else "")
+                    _label = f"{_name} ({_nat or '?'}) 德华 {_team or '?'}" + (f" [{_nickname}]" if _nickname else "")
                     general_rider_options[_label] = _url
                     general_url_to_label[_url] = _label
                     general_url_to_norm[_url] = _normalize(_name)
@@ -688,4 +559,3 @@ st.sidebar.selectbox(
     on_change=lambda: st.session_state.update({"language": st.session_state.lang_selector}),
     label_visibility="visible"
 )
-
