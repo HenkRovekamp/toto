@@ -161,6 +161,8 @@ def _render_pcs_fetch_button(race_name: str, stage_name: str, stages: list, fetc
                 if riders:
                     save_stage_results(DB_PATH, race_name, stage_name, riders)
                     st.session_state.pop(f"results_{prefix}_{stage_name}", None)
+                    for _i in range(15):
+                        st.session_state.pop(f"{prefix}_pos_{_i}_{stage_name}", None)
                     st.session_state[f"{prefix}_subtab"] = "view"
                     st.success(f"✓ {t('fetched_saved')} {len(riders)} {t('riders')} {stage_name}")
                     st.rerun()
