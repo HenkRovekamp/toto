@@ -66,8 +66,8 @@ if stage_rows:
         in_team = rider_url in my_rider_urls
         rows.append({
             t("col_pos"): pos,
-            t("col_rider"): ("✅ " if in_team else "") + (name or "?"),
-            t("col_nat"): nat or "?",
+            t("col_selected"): "✅" if in_team else "",
+            t("col_rider"): name or "?",
             t("col_team"): team or "?",
             t("col_points"): pts,
         })
@@ -75,9 +75,7 @@ if stage_rows:
     st.dataframe(df, hide_index=True, height=len(df) * 35 + 41, use_container_width=True)
 
     if my_team:
-        col_rider_key = t("col_rider")
-        col_points_key = t("col_points")
-        my_pts = sum(r[col_points_key] for r in rows if r[col_rider_key].startswith("✅"))
+        my_pts = sum(r[t("col_points")] for r in rows if r[t("col_selected")] == "✅")
         metric_slot.metric(t("your_points_this_stage"), my_pts)
 else:
     st.info(t("no_stage_results"))
