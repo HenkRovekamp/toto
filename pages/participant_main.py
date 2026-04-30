@@ -30,7 +30,7 @@ st.set_page_config(page_title="Stampers Toto", page_icon="🚴", layout="centere
 # Hide default multipage sidebar nav
 st.markdown("<style>[data-testid='stSidebarNav'] {display: none;}</style>", unsafe_allow_html=True)
 
-with open(os.path.join(_ROOT, "translations.json"), "r", encoding="utf-8") as f:
+with open(os.path.join(_ROOT, "translation", "translations.json"), "r", encoding="utf-8") as f:
     TRANSLATIONS = json.load(f)
 
 def _normalize(text: str) -> str:
